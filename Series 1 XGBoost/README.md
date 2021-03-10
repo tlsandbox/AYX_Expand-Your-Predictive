@@ -1,3 +1,4 @@
+# Expand Your Predictive Palette: XGBoost in Alteryx!
 https://community.alteryx.com/t5/Data-Science/Expand-Your-Predictive-Palette-XGBoost-in-Alteryx/ba-p/404262
 
 In 2017, Randal S. Olson published a paper using 13 state-of-the art algorithms on 157 datasets. It proved that gradient tree boosting models outperform other algorithms in most scenarios. The same year, KDNugget pointed out that there is a particular type of boosted tree model most widely adopted. More than half of the winning solutions in machine learning challenges in Kaggle use xgboost. 
