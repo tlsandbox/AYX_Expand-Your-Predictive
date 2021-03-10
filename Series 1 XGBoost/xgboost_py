@@ -1,0 +1,164 @@
+#################################
+# List all non-standard packages to be imported by your 
+# script here (only missing packages will be installed)
+from ayx import Package
+#Package.installPackages(['pandas','numpy'])
+from ayx import Alteryx
+
+
+#################################
+Package.installPackages('xgboost')
+
+
+#################################
+from ayx import Alteryx
+# First XGBoost model for Pima Indians dataset
+from numpy import loadtxt
+from xgboost import XGBClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+import pandas as pd
+import numpy as np
+
+
+#################################
+Alteryx.read("#1")
+
+
+#################################
+import xgboost
+
+
+#################################
+# load data
+
+X = Alteryx.read("#1")
+Y = Alteryx.read("#2")
+Z = Alteryx.read("#3")
+
+
+#################################
+# split data into train and test sets
+seed = 1
+test_size = 0.10
+X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=test_size, random_state=seed)
+# fit model on training data
+model = XGBClassifier()
+model.fit(X_train, y_train)
+# make predictions for test data
+predictions = model.predict(X_test)
+# evaluate predictions
+basic_acc = accuracy_score(y_test, predictions)
+print("Accuracy: %.2f%%" % (basic_acc * 100.0))
+
+
+#################################
+import shap
+# load JS visualization code to notebook
+shap.initjs()
+
+
+#################################
+# explain the model's predictions using SHAP
+# (same syntax works for LightGBM, CatBoost, scikit-learn and spark models)
+explainer = shap.TreeExplainer(model)
+shap_values = explainer.shap_values(Z)
+
+# visualize the first prediction's explanation (use matplotlib=True to avoid Javascript)
+shap.summary_plot(shap_values, Z, show=False)
+import matplotlib.pyplot as pl
+f = pl.gcf()
+chart_path = Alteryx.getWorkflowConstant("Engine.TempFilePath") + 'Case_Summary_Plot.png'
+print(chart_path)
+print(chart_path.replace('\\', '/'))
+f.savefig(chart_path.replace('\\', '/'), dpi = 100,  bbox_inches = "tight")
+print(Alteryx.readMetadata('#1'))
+Alteryx.write(pd.DataFrame([chart_path],columns =['chart_path']),5,{'chart_path':{'type':'V_WString','length': 999999}})
+
+
+
+#################################
+
+I = Z[:1]
+shap_values = explainer.shap_values(I)
+# visualize the training set predictions
+shap.force_plot(explainer.expected_value, shap_values, I, show=False, matplotlib=True)
+
+import matplotlib.pyplot as pl
+f = pl.gcf()
+f.set_size_inches(17, 3)
+chart_path = Alteryx.getWorkflowConstant("Engine.TempFilePath") + 'Individual_Bar_Plot.png'
+print(chart_path)
+print(chart_path.replace('\\', '/'))
+f.savefig(chart_path.replace('\\', '/'), dpi = 100,  bbox_inches = "tight")
+print(Alteryx.readMetadata('#1'))
+Alteryx.write(pd.DataFrame([chart_path],columns =['chart_path']),3,{'chart_path':{'type':'V_WString','length': 999999}})
+
+
+
+#################################
+model = XGBClassifier()
+eval_set = [(X_test, y_test)]
+model.fit(X_train, y_train, early_stopping_rounds=10, eval_metric="logloss",
+eval_set=eval_set, verbose=True)
+# make predictions for test data
+predictions = model.predict(X_test)
+# evaluate predictions
+earlystop_acc = accuracy_score(y_test, predictions)
+print("Accuracy: %.2f%%" % (earlystop_acc * 100.0))
+
+
+#################################
+feat_names = X.columns.values
+
+
+#################################
+from xgboost import plot_tree
+from matplotlib import pyplot
+from xgboost import plot_importance
+# plot feature importance
+plot_importance(model, ylabel = "feat_names")
+pyplot.show()
+
+
+#################################
+sorted_idx = np.argsort(model.feature_importances_)[::-1]
+
+
+#################################
+for index in sorted_idx:
+    print([X_train.columns[index], model.feature_importances_[index]]) 
+
+
+#################################
+#Select the best model with best acc above
+model.fit(X_train, y_train)
+score = model.predict(Z)
+
+
+#################################
+df2 = pd.DataFrame(data=score)
+
+
+#################################
+Alteryx.write(df2, 1)
+
+
+#################################
+from sklearn.metrics import confusion_matrix
+cm = confusion_matrix(predictions, y_test)
+
+
+#################################
+df3 = pd.DataFrame(data=cm, columns=['pred_pos','pred_neg'], index=['true_pos','true_neg'])
+
+
+#################################
+Alteryx.write(df3, 2)
+
+
+#################################
+from sklearn.metrics import accuracy_score
+acc = pd.DataFrame([basic_acc,earlystop_acc])
+
+Alteryx.write(acc, 4)

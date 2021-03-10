@@ -1,0 +1,117 @@
+# Conditional Install
+cond.install <- function(package.name){
+options(repos = "http://cran.rstudio.com") #set repo
+#check for package in library, if package is missing install
+if(package.name%in%rownames(installed.packages())==FALSE) {
+install.packages(package.name, .libPaths()[2])}else{require(package.name, character.only = TRUE)}}
+
+# conditionally install package
+cond.install('xgboost')
+cond.install('lime')
+cond.install('ROCR')
+cond.install('readr')
+cond.install('parallel')
+cond.install('Matrix')
+cond.install('data.table')
+
+# load package
+library(readr)
+library(ROCR)
+library(xgboost)
+library(parallel)
+library(Matrix)
+library(data.table)
+library(lime)
+
+#seed set up
+set.seed(123)
+
+#import data
+d_train <- read.Alteryx("#1", mode="data.frame")
+d_valid <- read.Alteryx("#2", mode="data.frame")
+d_test <- read.Alteryx("#3", mode="data.frame")
+r_data <- read.Alteryx("#4", mode="data.frame")
+
+#Sample split
+system.time({
+  X_train_valid_test <- sparse.model.matrix(%Question.target.var% ~ .-1, data = rbind(d_train, d_valid, d_test))
+  n1 <- nrow(d_train)
+  n2 <- nrow(d_valid)
+  n3 <- nrow(d_test)
+  X_train <- X_train_valid_test[1:n1,]
+  X_valid <- X_train_valid_test[(n1+1):(n1+n2),]
+  X_test <- X_train_valid_test[(n1+n2+1):(n1+n2+n3),]
+})
+dim(X_train)
+
+#XGBoost Matrix is required before build the model
+dxgb_train <- xgb.DMatrix(data = X_train, label = ifelse(d_train$%Question.target.var%=='1',1,0))
+dxgb_valid <- xgb.DMatrix(data = X_valid, label = ifelse(d_valid$%Question.target.var%=='1',1,0))
+dxgb_test  <- xgb.DMatrix(data = X_test,  label = ifelse(d_test$%Question.target.var%=='1',1,0))
+
+#Model Training
+system.time({
+  n_proc <- detectCores()
+  md <- xgb.train(data = dxgb_train, nthread = n_proc, 
+          objective = "%Question.objective.var%", nrounds = %Question.roundno.var%, 
+          max_depth = 20, eta = %Question.lr.var%, 
+          min_child_weight = 1, subsample = 0.5,
+          watchlist = list(valid = dxgb_valid, train = dxgb_train), 
+          eval_metric = "auc",
+          early_stopping_rounds = 10, print_every_n = 10)
+})
+
+phat <- predict(md, newdata = X_test)
+
+
+#Cross validation
+system.time({
+  n_proc <- detectCores()
+  cv <- xgb.cv(data = dxgb_train, nthread = n_proc, 
+            objective = "%Question.objective.var%", nrounds = %Question.roundno.var%, 
+            nfold = 5,
+            max_depth = 20, eta = %Question.lr.var%, 
+            min_child_weight = 1, subsample = 0.5,
+            eval_metric = "auc",
+            early_stopping_rounds = 10, print_every_n = 10)
+})
+print(cv, verbose=TRUE)
+
+
+#Evaluation Matrix export
+acc <- mean(md$evaluation_log$train_auc)
+names(acc) <- c("Area Under Curve")
+write.Alteryx(acc, 1)
+
+
+#Feature Importance List
+feature <- xgb.importance(model = md)
+write.Alteryx(feature, 2)
+
+
+
+#Tree Deepness Plot
+AlteryxGraph(3, width=2400, height=3000, res=300)
+xgb.ggplot.deepness(model = md)
+#pie(c(0.12, 0.3, 0.26), col = c("purple","violetred1","green3"))
+invisible(dev.off())
+
+
+
+pred <- predict(md, data.matrix(r_data))
+dt <- as.data.table(pred)
+pred_t <- as.list(data.table(dt))
+write.Alteryx(pred_t, 4)
+
+
+# Create a list with the model object and its name and write it out via
+# the third output
+model.name <- "xgboost"
+the.obj <- vector(mode="list", length=2)
+the.obj[[1]] <- c(model.name)
+the.obj[[2]] <- list(the.model)
+names(the.obj) <- c("Name", "Object")
+write.Alteryx(the.obj, nOutput = 5)
+
+
+
