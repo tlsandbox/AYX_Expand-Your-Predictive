@@ -1,0 +1,27 @@
+library(factoextra)
+library(fpc)
+library(dbscan)
+data <- read.Alteryx("#1", mode="data.frame")
+
+
+# find optimal eps
+AlteryxGraph(2, width=2400, height=3000, res=300)
+kNNdistplot(data,k = 4)
+abline(h=0.4,lty=2)
+invisible(dev.off())
+
+
+# apply dbscan 
+set.seed(123)
+db<-dbscan::dbscan(data,eps = %Question.eps.var%, minPts = %Question.minpt.var%)
+# dbscan package is faster than fpc in implementing dbscan(), 
+# thus a better choice for large datasets
+print(db)
+write.Alteryx(db, 1)
+
+
+AlteryxGraph(3, width=576, height=576)
+
+fviz_cluster(db,data,geom = "point")
+invisible(dev.off())
+

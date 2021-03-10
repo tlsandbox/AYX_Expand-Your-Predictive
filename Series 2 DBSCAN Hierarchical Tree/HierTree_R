@@ -1,0 +1,39 @@
+library(cluster)
+library(dendextend)
+library(factoextra)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(purrr)
+
+# Standardize the data
+df <- read.Alteryx("#1", mode="data.frame")
+
+# Compute the dissimilarity matrix
+# df = the standardized data
+res.dist <- dist(df, method = "%Question.distance%")
+
+res.hc <- hclust(res.dist, method = "%Question.cluster%")
+
+dendro <- as.dendrogram(res.hc)
+dendro.col <- dendro %>%
+  set("branches_k_color", k = %Question.number%, value =   c("darkslategray", "darkslategray4", "darkslategray3", "gold3", "darkcyan", "cyan3", "gold3")) %>%
+  set("branches_lwd", 0.6) %>%
+  set("labels_colors", 
+      value = c("darkslategray")) %>% 
+  set("labels_cex", 0.5)
+ggd1 <- as.ggdend(dendro.col)
+
+AlteryxGraph(1, width=2400, height=3000, res=300)
+
+ggplot(ggd1, theme = theme_minimal()) +
+  labs(x = "Num. observations", y = "Height", title = "Dendrogram, k = %Question.number%")
+invisible(dev.off())
+
+
+# Cut tree into k groups
+grp <- cutree(res.hc, k = "%Question.number%")
+# Number of members in each cluster
+
+df2 <- mutate(df, cluster = grp)
+write.Alteryx(df2, 2)

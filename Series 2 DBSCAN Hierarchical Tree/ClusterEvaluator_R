@@ -1,0 +1,55 @@
+library(factoextra)
+library(NbClust)
+
+df <- read.Alteryx("#1", mode="data.frame")
+
+if ('%Question.elbow%' == "True") {
+	AlteryxGraph(1, width=2400, height=3000, res=300)
+	# Elbow method
+	fviz_nbclust(df, FUNcluster = %Question.fun%, method = "wss") +
+	    geom_vline(xintercept = 4, linetype = 2)+
+	  labs(subtitle = "Elbow method")
+} 
+
+if ('%Question.elbow%' == "False") {
+	AlteryxGraph(1, width=2400, height=3000, res=300)
+} 
+
+if ('%Question.silhouette%' == "True") {
+	AlteryxGraph(2, width=2400, height=3000, res=300)
+	# Silhouette method
+	fviz_nbclust(df, FUNcluster = %Question.fun%, method = "silhouette")+
+	  labs(subtitle = "Silhouette method")
+} 
+
+if ('%Question.silhouette%' == "False") {
+	AlteryxGraph(2, width=2400, height=3000, res=300)
+} 
+
+if ('%Question.gap%' == "True") {
+	AlteryxGraph(3, width=2400, height=3000, res=300)
+	# Gap statistic
+	# nboot = 50 to keep the function speedy. 
+	# recommended value: nboot= 500 for your analysis.
+	# Use verbose = FALSE to hide computing progression.
+	set.seed(123)
+	fviz_nbclust(df, FUNcluster = %Question.fun%, nstart = 25,  method = "gap_stat", nboot = 50)+
+	  labs(subtitle = "Gap statistic method")
+} 
+
+if ('%Question.gap%' == "False") {
+	AlteryxGraph(3, width=2400, height=3000, res=300)
+} 
+
+if ('%Question.nbclus%' == "True") {
+	res.nbclust <- NbClust(df, distance = "euclidean",
+	                  min.nc = 2, max.nc = 9, 
+	                  method = "%Question.nbclust%", index ="all")
+	AlteryxGraph(4, width=2400, height=3000, res=300)
+	factoextra::fviz_nbclust(res.nbclust) + theme_minimal() + ggtitle("NbClust's optimal number of clusters")
+}
+
+
+if ('%Question.nbclus%' == "False") {
+	AlteryxGraph(4, width=2400, height=3000, res=300)
+}
