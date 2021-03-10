@@ -1,0 +1,44 @@
+# Conditional Install
+cond.install <- function(package.name){
+options(repos = "http://cran.rstudio.com") #set repo
+#check for package in library, if package is missing install
+if(package.name%in%rownames(installed.packages())==FALSE) {
+install.packages(package.name, .libPaths()[2])}else{require(package.name, character.only = TRUE)}}
+
+# conditionally install package
+cond.install('MissMech')
+cond.install('broom')
+cond.install('VIM')
+
+# load package
+library(MissMech)
+library(broom)
+library(VIM)
+
+y = read.Alteryx("#1", mode="data.frame")
+
+# alpha = 0.05
+mcar <- (TestMCARNormality(data = y, imputation.number = 10))
+
+
+out <- capture.output(mcar)
+out
+
+df1 = data.frame(out[1:1000])
+names(df1)[1] <- "test"
+
+
+AlteryxGraph(1, width=576, height=576)
+boxplot(mcar)#Insert code to plot graph here
+#pie(c(0.12, 0.3, 0.26), col = c("purple","violetred1","green3"))
+invisible(dev.off())
+
+write.Alteryx(df1, 2)
+
+
+AlteryxGraph(3, width=576, height=576)
+aggr_plot <- aggr(y, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(y), cex.axis=0.7, gap=3, , ylab=c("Histogram of missing data","Pattern"),oma = c(10,5,5,3))
+#Insert code to plot graph here
+#pie(c(0.12, 0.3, 0.26), col = c("purple","violetred1","green3"))
+invisible(dev.off())
+

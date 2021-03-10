@@ -1,0 +1,38 @@
+# Conditional Install
+cond.install <- function(package.name){
+options(repos = "http://cran.rstudio.com") #set repo
+#check for package in library, if package is missing install
+if(package.name%in%rownames(installed.packages())==FALSE) {
+install.packages(package.name, .libPaths()[2])}else{require(package.name, character.only = TRUE)}}
+
+# conditionally install package
+cond.install('missForest')
+cond.install('doParallel')
+
+# load package
+library(missForest)
+library(doParallel)
+
+# define number of cores 
+numcore = detectCores() - 2
+
+
+
+registerDoParallel(cores = numcore)
+
+set.seed(%Question.seed.var%)
+
+df = read.Alteryx("#1", mode="data.frame")
+
+imp = missForest(df, maxiter = %Question.maxit.var%, ntree = %Question.ntree.var%,  parallelize = "variables")
+
+df2 = imp$ximp
+
+
+error = imp$OOBerror
+
+write.Alteryx(df2, 1)
+
+write.Alteryx(error,2)
+
+

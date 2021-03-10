@@ -1,0 +1,52 @@
+# Conditional Install
+cond.install <- function(package.name){
+options(repos = "http://cran.rstudio.com") #set repo
+#check for package in library, if package is missing install
+if(package.name%in%rownames(installed.packages())==FALSE) {
+install.packages(package.name, .libPaths()[2])}else{require(package.name, character.only = TRUE)}}
+
+# conditionally install package
+cond.install('mice')
+
+# load package
+library(mice)
+
+df = read.Alteryx("#1", mode="data.frame")
+
+
+if ('%Question.default.var%' == "True") {
+	impute = mice(df, m = %Question.m.var%, maxit = %Question.maxit.var%, seed = %Question.seed.var%, print=F)
+}
+
+
+if ('%Question.manual.var%' == "True") {
+	impute = mice(df, method = "%Question.method.var%", m = %Question.m.var%, maxit = %Question.maxit.var%, seed = %Question.seed.var%, print=F)
+}
+
+AlteryxGraph(2, width=576, height=576)
+
+plot(impute)#Insert code to plot graph here
+#pie(c(0.12, 0.3, 0.26), col = c("purple","violetred1","green3"))
+invisible(dev.off())
+
+
+AlteryxGraph(3, width=576, height=576)
+md.pattern(df, rotate.names = TRUE)
+#Insert code to plot graph here
+#pie(c(0.12, 0.3, 0.26), col = c("purple","violetred1","green3"))
+invisible(dev.off())
+
+
+df2 = complete(impute)
+write.Alteryx(df2, 1)
+
+
+df3 = impute$meth
+write.Alteryx(df3, 4)
+
+
+# if all variables are numeric, consider add Density Plot for examination
+# Backup report for density plot. Feel free to uncomment it
+#AlteryxGraph(5, width=576, height=576)
+#densityplot(impute)
+#invisible(dev.off())
