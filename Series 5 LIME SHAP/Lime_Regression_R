@@ -1,0 +1,154 @@
+# Conditional Install
+cond.install <- function(package.name){
+options(repos = "http://cran.rstudio.com") #set repo
+#check for package in library, if package is missing install
+if(package.name%in%rownames(installed.packages())==FALSE) {
+install.packages(package.name, .libPaths()[2])}else{require(package.name, character.only = TRUE)}}
+
+# conditionally install package
+cond.install('lime')
+
+library(lime)
+library(caret)
+library(gbm)
+library(randomForest)
+library(nnet)
+library(stats)
+library(e1071)
+library(survey)
+library(earth)
+library(glmnet)
+
+
+### unseralized models 
+the.model <- read.Alteryx("#1")
+if (!all(names(the.model) %in% c("Name", "Object")))
+	stop.Alteryx("A model object was not provided")
+model <- unserializeObject(as.character(the.model$Object[1]))
+
+
+### Create Linear Regression Functions
+model_type.lm <- function(x, ...) {
+  return("regression")
+}
+
+predict_model.lm <- function(x, newdata, ...) {
+  pred <- predict(x, newdata)
+  return(as.data.frame(pred))
+}
+
+
+### Create Decision Tree Functions
+model_type.rpart <- function(x, ...) {
+  return("regression")
+}
+
+predict_model.rpart <- function(x, newdata, ...) {
+  pred <- predict(x, newdata)
+  return(as.data.frame(pred))
+}
+
+
+### Create Gradient Boosted Model Functions
+model_type.gbm <- function(x, ...) {
+  return("regression")
+}
+
+predict_model.gbm <- function(x, newdata, ...) {
+  pred <- predict(x, newdata, type = "response", n.trees = x$best.trees)
+  return(as.data.frame(pred))
+}
+
+
+### Create Random Forest Functions
+model_type.randomForest <- function(x, ...) {
+  return("regression")
+}
+
+predict_model.randomForest <- function(x, newdata, ...) {
+  pred <- predict(x, newdata, type = "prob")
+  return(as.data.frame(pred))
+}
+
+
+### Create Neural Network Functions
+model_type.nnet <- function(x, ...) {
+  return("regression")
+}
+
+predict_model.nnet <- function(x, newdata, ...) {
+  pred <- predict(x, newdata, type = "raw")
+  return(as.data.frame(pred))
+}
+
+### Create SVM Functions
+model_type.svm <- function(x, ...) {
+  return("regression")
+}
+
+predict_model.svm <- function(x, newdata, ...) {
+  pred <- predict(x, newdata, decision.values = TRUE, probability = TRUE,
+                 na.action = na.omit)
+  return(as.data.frame(pred))
+}
+
+### Create svyglm Functions
+model_type.svyglm <- function(x, ...) {
+  return("regression")
+}
+
+predict_model.svyglm <- function(x, newdata, ...) {
+  pred <- predict(x, newdata, type = "response")
+  return(as.data.frame(pred))
+}
+
+### Create earth/MARS/Spline Functions
+model_type.earth <- function(x, ...) {
+  return("regression")
+}
+
+predict_model.earth <- function(x, newdata, ...) {
+  pred <- predict(x, newdata, type = "response")
+  return(as.data.frame(pred))
+}
+
+
+
+
+# Load data
+
+set.seed(7)
+train = read.Alteryx("#2", mode="data.frame")
+test = read.Alteryx("#3", mode="data.frame")
+
+# Create an explainer object
+explainer <- lime(train, model)
+
+
+
+
+
+# Explain new observation
+explanation <- explain(test, explainer, n_features = %Question.feature.var%, n_permutations = %Question.permute.var%)
+
+
+AlteryxGraph(1, width=576, height=576)
+
+plot_features(explanation)
+
+invisible(dev.off())
+
+
+AlteryxGraph(2, width=576, height=576)
+
+plot_explanations(explanation)
+
+invisible(dev.off())
+
+
+explanation[] = lapply(explanation, as.character)
+
+write.Alteryx(explanation, 3)
+
+
+
