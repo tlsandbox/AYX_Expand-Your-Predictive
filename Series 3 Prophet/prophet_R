@@ -1,0 +1,151 @@
+# Conditional Install
+cond.install <- function(package.name){
+options(repos = "http://cran.rstudio.com") #set repo
+#check for package in library, if package is missing install
+if(package.name%in%rownames(installed.packages())==FALSE) {
+install.packages(package.name, .libPaths()[2])}else{require(package.name, character.only = TRUE)}}
+
+# conditionally install package
+cond.install('forecast')
+cond.install('prophet')
+cond.install('rBayesianOptimization')
+cond.install('dplyr')
+cond.install('lubridate')
+
+
+library(dplyr)
+library(lubridate)
+library(forecast)
+library(prophet)
+library(rBayesianOptimization)
+
+
+
+#reading data
+cv_set <- read.Alteryx("#1", mode="data.frame")
+valid <- read.Alteryx("#2", mode="data.frame")
+
+#make sure the date format is defined
+
+cv_set$ds <- as.Date(cv_set$ds)
+date_seq <- as.Date(valid$ds)
+
+#define hyper search parameter
+rand_search_grid =  data.frame( 
+  changepoint_prior_scale = sort(runif(10, 0.01, 1)),
+  seasonality_prior_scale = c(sort(sample(c(runif(5, 0.01, 0.05), runif(5, 1, 20)), 5, replace = F)),
+                              sort(sample(c(runif(5, 0.01, 0.05), runif(5, 1, 20)), 5, replace = F))),
+  n_changepoints          = sample(5:50, 10, replace = F)
+
+)
+
+#Define deafult function for prophet. Change Linear to Logistic cap setting
+prophet_fit_bayes = function(changepoint_prior_scale, seasonality_prior_scale, n_changepoints) {
+    
+    error = c()
+    for (d in date_seq) {
+      train = subset(cv_set, ds < d)
+      test  = subset(cv_set, ds == d)
+    
+      m = prophet(train, growth = 'linear',
+                 seasonality.prior.scale = seasonality_prior_scale, 
+                 changepoint.prior.scale = changepoint_prior_scale,
+                 n.changepoints = n_changepoints,
+                 weekly.seasonality = F,
+                 daily.seasonality = F)
+    
+      future = make_future_dataframe(m, periods = 1)
+    
+    # NOTE: There's a problem in function names with library(caret)
+      forecast = predict(m, future)
+      forecast$ds = as.Date(forecast$ds)
+    
+      error_d = forecast::accuracy(forecast[forecast$ds %in% test$ds, 'yhat'], test$y)[ , 'MAPE']
+      error = c(error, error_d)
+  }
+  
+    ## The function wants to _maximize_ the outcome so we return 
+    ## the negative of the resampled MAPE value. `Pred` can be used
+    ## to return predicted values but we'll avoid that and use zero
+    list(Score = -mean(error), Pred = 0)
+}
+  
+changepoint_bounds    = range(rand_search_grid$changepoint_prior_scale)
+n_changepoint_bounds  = as.integer(range(rand_search_grid$n_changepoints))
+seasonality_bounds    = range(rand_search_grid$seasonality_prior_scale)
+
+bayesian_search_bounds = list(changepoint_prior_scale = changepoint_bounds,
+                              seasonality_prior_scale = seasonality_bounds,
+                              n_changepoints = as.integer(n_changepoint_bounds))
+
+
+#rBayesian parameters. Assume n_iteration is 1 for demo purpose
+ba_search = BayesianOptimization(prophet_fit_bayes,
+                                    bounds = bayesian_search_bounds,
+                                    init_grid_dt = rand_search_grid, 
+                                    init_points = 1, 
+                                    n_iter = %Question.iteration.var%,
+                                    acq = 'ucb', 
+                                    kappa = 1, 
+                                    eps = 0,
+                                    verbose = TRUE)
+
+
+best_params_ba  = c(ba_search$Best_Par)
+
+
+
+#Start Prophet 
+
+# Holiday Setting
+custom1 <- data_frame(
+  holiday = 'custom1',
+  ds = as.Date(c('1991-12-31')))
+
+custom2 <- data_frame(
+  holiday = 'custom2',
+  ds = as.Date(c('1992-12-31', '1993-01-01')))
+holidays <- bind_rows(custom1, custom2)
+
+
+if ('%Question.noholiday.var%' == "True") {
+	m = prophet(cv_set, growth = 'linear',
+                 seasonality.prior.scale = best_params_ba[['seasonality_prior_scale']], 
+                 changepoint.prior.scale = best_params_ba[['changepoint_prior_scale']],
+                 n.changepoints = best_params_ba[['n_changepoints']])
+}
+if ('%Question.holiday.var%' == "True") {
+	m <- prophet(holidays = holidays, growth = 'linear',
+                 seasonality.prior.scale = best_params_ba[['seasonality_prior_scale']], 
+                 changepoint.prior.scale = best_params_ba[['changepoint_prior_scale']],
+                 n.changepoints = best_params_ba[['n_changepoints']])
+	m <- add_country_holidays(m, country_name = '%Question.country.var%')
+	m <- fit.prophet(m, cv_set)
+}
+
+future <- make_future_dataframe(m, periods = %Question.forecast.var%)
+forecast <- predict(m, future)
+
+yhat <- as.data.frame(forecast$yhat)
+yhat_l <- as.data.frame(forecast$yhat_lower)
+yhat_u <-as.data.frame(forecast$yhat_upper)
+trend <- as.data.frame(forecast$trend)
+
+df1 <- cbind(yhat, yhat_l, yhat_u, trend)
+
+write.Alteryx(df1, 1)
+
+AlteryxGraph(3, width=576, height=576)
+plot(m, forecast) + add_changepoints_to_plot(m)
+invisible(dev.off())
+
+
+AlteryxGraph(4, width=576, height=576)
+prophet_plot_components(m, forecast)
+invisible(dev.off())
+
+
+#Output best params for reference
+df5 <- best_params_ba
+
+write.Alteryx(df5, 5)
