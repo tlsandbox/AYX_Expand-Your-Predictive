@@ -1,4 +1,5 @@
-#Expand Your Predictive Palette II: Beyond K-Means
+# Expand Your Predictive Palette II: Beyond K-Means
+
 https://community.alteryx.com/t5/Data-Science/Expand-Your-Predictive-Palette-II-Beyond-K-Means/ba-p/452411
 
 After enriching our supervised learning palette, folks asked: How about an unsupervised technique like clustering or dimension reduction?
